@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>tutorial</title>
+</head>
+<style>
+    div#content{margin: 10px;}
+</style>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<body>
+<input name="b1" type="button" value="swap two bits" onclick="make_from_data('tutorial-swap.json')" />
+<input name="b2" type="button" value="swap two (decomp)" onclick="make_from_data('tutorial-swap-cbloq.json')" />
+<input name="b1" type="button" value="multiswap" onclick="make_from_data('tutorial-multiswap.json')" />
+<input name="b2" type="button" value="multiswap (decomp)" onclick="make_from_data('tutorial-multiswap-cbloq.json')" />
+<input name="b2" type="button" value="multiswap (doubledecomp)" onclick="make_from_data('tutorial-multiswap-cbloq-flat.json')" />
+<div id="content">
+
+</div>
+<script>
+    const xDomain = [-2, 20];
+    const yDomain = [-1, 11];
+</script>
+<script src="musical_score.js"></script>
+</body>
+</html>
