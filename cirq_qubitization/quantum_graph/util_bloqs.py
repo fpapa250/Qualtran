@@ -142,3 +142,12 @@ class Free(Bloq):
     @cached_property
     def registers(self) -> FancyRegisters:
         return FancyRegisters([FancyRegister('free', bitsize=self.n, side=Side.LEFT)])
+
+
+@frozen
+class ArbitraryClifford(Bloq):
+    n: int
+
+    @cached_property
+    def registers(self) -> FancyRegisters:
+        return FancyRegisters([FancyRegister('x', bitsize=self.n)])

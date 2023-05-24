@@ -207,6 +207,12 @@ class Bloq(metaclass=abc.ABCMeta):
         """
         return not self.add_my_tensors.__qualname__.startswith('Bloq.')
 
+    def rough_decompose(self, mgr):
+        return self.decompose_bloq().rough_decompose(mgr)
+
+    def declares_rough_decomposition(self):
+        return not self.rough_decompose.__qualname__.startswith('Bloq.')
+
     def t_complexity(self) -> 'TComplexity':
         """The `TComplexity` for this bloq.
 

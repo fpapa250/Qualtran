@@ -177,6 +177,11 @@ class CompositeBloq(Bloq):
     def decompose_bloq(self) -> 'CompositeBloq':
         raise NotImplementedError("Come back later.")
 
+    def rough_decompose(self, mgr):
+        from cirq_qubitization.quantum_graph.bloq_counts import _cbloq_bloq_counts
+
+        return _cbloq_bloq_counts(self)
+
     def iter_bloqnections(
         self,
     ) -> Iterator[Tuple[BloqInstance, List[Connection], List[Connection]]]:
