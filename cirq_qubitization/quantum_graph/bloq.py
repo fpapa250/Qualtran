@@ -247,6 +247,14 @@ class Bloq(metaclass=abc.ABCMeta):
         """
         return not self.t_complexity.__qualname__.startswith('Bloq.')
 
+    def controlled(self) -> 'Bloq':
+        from cirq_qubitization.quantum_graph.meta_bloq import ControlledBloq
+
+        return ControlledBloq(self)
+
+    def declares_controlled(self) -> bool:
+        return not self.controlled.__qualname__.startswith('Bloq.')
+
     def as_cirq_op(
         self, qubit_manager: 'cirq.QubitManager', **cirq_quregs: 'CirqQuregT'
     ) -> Tuple[Union['cirq.Operation', None], Dict[str, 'CirqQuregT']]:

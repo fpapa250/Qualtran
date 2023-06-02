@@ -16,7 +16,8 @@ class BloqInstance:
             within a `CompositeBloq`.
     """
 
-    bloq: Bloq
+    # TODO: sometimes bloqs aren't hashable or equalityable if they have e.g. numpy data
+    bloq: Bloq = field(eq=False)
     i: int
 
     def __str__(self):

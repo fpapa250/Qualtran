@@ -18,7 +18,7 @@ from cirq_qubitization.quantum_graph.quantum_graph import Soquet
 def _no_nesting_ctrls_yet(instance, field, val):
     # https://github.com/quantumlib/cirq-qubitization/issues/149
     assert isinstance(val, Bloq)
-    if 'control' in [reg.name for reg in val.registers]:
+    if 'ctrl' in [reg.name for reg in val.registers]:
         raise NotImplementedError("`ControlledBloq` doesn't support nesting yet.") from None
 
 
@@ -40,7 +40,7 @@ class ControlledBloq(Bloq):
     @cached_property
     def registers(self) -> FancyRegisters:
         return FancyRegisters(
-            [FancyRegister(name="control", bitsize=1)] + list(self.subbloq.registers)
+            [FancyRegister(name="ctrl", bitsize=1)] + list(self.subbloq.registers)
         )
 
     def decompose_bloq(self) -> 'CompositeBloq':
@@ -50,16 +50,16 @@ class ControlledBloq(Bloq):
         bb, _ = CompositeBloqBuilder.from_registers(
             self.subbloq.registers, add_registers_allowed=True
         )
-        ctrl = bb.add_register('control', 1)
+        ctrl = bb.add_register('ctrl', 1)
 
         soq_map: List[Tuple[SoquetT, SoquetT]] = []
         for binst, in_soqs, old_out_soqs in self.subbloq.iter_bloqsoqs():
             in_soqs = map_soqs(in_soqs, soq_map)
-            ctrl, *new_out_soqs = bb.add(ControlledBloq(binst.bloq), control=ctrl, **in_soqs)
+            ctrl, *new_out_soqs = bb.add(binst.bloq.controlled(), ctrl=ctrl, **in_soqs)
             soq_map.extend(zip(old_out_soqs, new_out_soqs))
 
         fsoqs = map_soqs(self.subbloq.final_soqs(), soq_map)
-        return bb.finalize(control=ctrl, **fsoqs)
+        return bb.finalize(ctrl=ctrl, **fsoqs)
 
     def wire_symbol(self, soq: 'Soquet') -> 'WireSymbol':
         if soq.reg.name == 'ctrl':
