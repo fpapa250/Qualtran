@@ -29,10 +29,11 @@ Usage as a script:
 """
 
 import inspect
+import os
 import re
 from pathlib import Path
 from types import ModuleType
-from typing import Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import Callable, Dict, List, Optional, Tuple, Type, Union, Sequence
 
 import nbformat
 from attrs import frozen, mutable
@@ -477,5 +478,27 @@ def render_notebooks():
             nbformat.write(nb, f)
 
 
-if __name__ == '__main__':
-    render_notebooks()
+def get_markdown_class_api_reference(cls: Type):
+    """From a class `cls`, return its docstring as Markdown."""
+
+    # 1. Sphinx incantation
+    config = Config()
+
+    def _pp(doc: Union[None, str], title: str):
+        docstring = doc if doc else ""
+        gds = _GoogleDocstringToMarkdown(inspect.cleandoc(docstring), config=config, what='class')
+        lines = [title] + gds.lines()
+
+        # 3. Substitute restructured text inline-code blocks to markdown-style backticks.
+        lines = [re.sub(r':py:func:`(\w+)`', r'`\1`', line) for line in lines]
+        return '\n'.join(lines)
+
+    cls_doc = _pp(cls.__doc__, f'# `{cls.__name__}`')
+    meth_docs = []
+    for k in dir(cls):
+        if k.startswith('_'):
+            continue
+
+        meth_docs.append(_pp(getattr(cls, k).__doc__, f'## `{k}`'))
+
+    return cls_doc, meth_docs
