@@ -7,7 +7,11 @@ from numpy.typing import NDArray
 
 from cirq_qubitization import TComplexity
 from cirq_qubitization.quantum_graph.bloq import Bloq
-from cirq_qubitization.quantum_graph.composite_bloq import SoquetT
+from cirq_qubitization.quantum_graph.composite_bloq import (
+    CompositeBloq,
+    CompositeBloqBuilder,
+    SoquetT,
+)
 from cirq_qubitization.quantum_graph.fancy_registers import FancyRegister, FancyRegisters
 from cirq_qubitization.quantum_graph.quantum_graph import Soquet
 
@@ -76,7 +80,7 @@ class UnaryIteration(Bloq):
     @cached_property
     def registers(self) -> FancyRegisters:
         bitsize = (max(self.iteration_shape) - 1).bit_length()
-        return FancyRegisters([FancyRegister('x', bitsize, wireshape=self.iteration_shape)])
+        return FancyRegisters([FancyRegister('x', bitsize, wireshape=(len(self.iteration_shape),))])
 
     def pretty_name(self) -> str:
         reg_name = self.registers[0].name
@@ -87,57 +91,58 @@ class UnaryIteration(Bloq):
         return TComplexity(t=t_count)
 
 
-# @frozen
-# class SelectedMajoranaFermion(Bloq):
-#     """ """
-
-#     iteration_lengths: Tuple[int, ...]
-#     cvs: Tuple[int, ...] = tuple()
-#     gate: Bloq
-
-#     @cached_property
-#     def registers(self, selection_names: Tuple[str], target_bitsize: int) -> FancyRegisters:
-#         regs = [FancyRegister(f'In[{name}]', bitsize) for name in selection_names]
-#         regs.append(FancyRegister(f"{self.gate.short_name()}", target_bitsize))
-#         return FancyRegisters(regs)
-
-#     def t_complexity(self) -> TComplexity:
-#         pass
-
-#     def build_composite_bloq(
-#         self,
-#         bb: 'CompositeBloqBuilder',
-#         *,
-#         ctrl: NDArray[Soquet],
-#         sel_regs: List[SoquetT],
-#         trg_reg: SoquetT,
-#     ) -> Dict[str, 'SoquetT']:
-#         """"""
-#         regs = self.registers()
-#         out = {}
-#         for it_len, reg in zip(iteration_lengths, sel_regs):
-#             out = bb.add(UnaryIteration(it_len))
-#         # y, x = bb.add(CNOT(), control=y, target=x)
-#         # x, y = bb.add(CNOT(), control=x, target=y)
-
-
 @frozen
-class PrepareChem(Bloq):
-    """
-
+class SelectedMajoranaFermion(Bloq):
+    """SelectMajoranaFermion Bloq
     Args:
-        cv1: Whether the first bit is a positive control.
-        cv2: Whether the second bit is a positive control.
 
     Registers:
-     - p: A two-bit control register.
-     - (right) target: The output bit.
 
     References:
         (Encoding Electronic Spectra in Quantum Circuits with Linear T Complexity)[https://arxiv.org/abs/1805.03662].
             Babbush et. al. 2018. Section III.A. and Fig. 4.
-        (Verifying Measurement Based Uncomputation)[https://algassert.com/post/1903].
-            Gidney, C. 2019.
+    """
+
+    selection_desc: Tuple[Tuple[str, Tuple[int, ...]]]
+    target_bitsize: int
+    gate: Bloq
+    cvs: Tuple[int, ...] = tuple()
+
+    @cached_property
+    def registers(self) -> FancyRegisters:
+        reg_desc = {
+            name: ((max(it_shape) - 1).bit_length(), (len(it_shape),))
+            for name, it_shape in self.selection_desc
+        }
+        return FancyRegisters(
+            [FancyRegister(n, bitsize=b, wireshape=w) for n, (b, w) in reg_desc.items()]
+        )
+
+    def t_complexity(self) -> TComplexity:
+        iteration_size = sum([np.prod(it_shape) for _, it_shape in self.selection_desc])
+        return TComplexity(t=4 * iteration_size - 4)
+
+    def build_composite_bloq(
+        self, bb: 'CompositeBloqBuilder', *, sel_regs: List[SoquetT], trg_reg: SoquetT
+    ) -> Dict[str, 'SoquetT']:
+        regs = self.registers()
+        out = {}
+        # for reg_name, iteration_shape in self.selection_desc:
+        #     out = bb.add(UnaryIteration(iteration_shape))
+        # for t in trg_reg:
+        # bb.add(self.gate, t)
+
+
+@frozen
+class PrepareChem(Bloq):
+    """PrepareChem Bloq
+    Args:
+
+    Registers:
+
+    References:
+        (Encoding Electronic Spectra in Quantum Circuits with Linear T Complexity)[https://arxiv.org/abs/1805.03662].
+            Babbush et. al. 2018. Section III.A. and Fig. 4.
     """
 
     M: int

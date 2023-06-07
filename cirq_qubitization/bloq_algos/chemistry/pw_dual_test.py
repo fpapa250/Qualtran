@@ -23,6 +23,16 @@ def _make_unary_iteration():
     return UnaryIteration(shape)
 
 
+def _make_selected_majorana():
+    import numpy as np
+
+    from cirq_qubitization.bloq_algos.basic_gates import XGate
+    from cirq_qubitization.bloq_algos.chemistry.pw_dual import SelectedMajoranaFermion
+
+    selection_desc = (("p", (3, 3, 3)), ("alpha", (2,)))
+    return SelectedMajoranaFermion(selection_desc, XGate())
+
+
 def test_notebook():
     execute_notebook('chemistry')
 

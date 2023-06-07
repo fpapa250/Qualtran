@@ -204,6 +204,7 @@ NOTEBOOK_SPECS: List[NotebookSpec] = [
             BloqNbSpec(cirq_qubitization.bloq_algos.chemistry.pw_dual_test._make_select),
             BloqNbSpec(cirq_qubitization.bloq_algos.chemistry.pw_dual_test._make_prepare),
             BloqNbSpec(cirq_qubitization.bloq_algos.chemistry.pw_dual_test._make_unary_iteration),
+            BloqNbSpec(cirq_qubitization.bloq_algos.chemistry.pw_dual_test._make_selected_majorana),
         ],
         directory='./bloq_algos/chemistry',
     ),
