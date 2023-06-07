@@ -1,1 +1,1 @@
-from . import and_bloq, basic_gates
+from . import and_bloq, basic_gates, chemistry

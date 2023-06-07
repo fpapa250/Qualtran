@@ -2,9 +2,9 @@ from functools import cached_property
 from typing import Tuple
 
 import numpy as np
-from attrs import field, frozen
-from cirq_qubitization import TComplexity
+from attrs import frozen
 
+from cirq_qubitization import TComplexity
 from cirq_qubitization.quantum_graph.bloq import Bloq
 from cirq_qubitization.quantum_graph.fancy_registers import FancyRegister, FancyRegisters
 
@@ -23,7 +23,8 @@ class SelectChem(Bloq):
     """
 
     M: int
-    cvs: Tuple[int, ...] = field(default_factory=lambda: (,))
+    cvs: Tuple[int, ...] = tuple()
+    adjoint: bool = False
 
     @cached_property
     def registers(self) -> FancyRegisters:
@@ -32,9 +33,9 @@ class SelectChem(Bloq):
                 FancyRegister('theta', 1),
                 FancyRegister('U', 1),
                 FancyRegister('V', 1),
-                FancyRegister('p', (self.M-1).bit_length(), wireshape=(3,)),
+                FancyRegister('p', (self.M - 1).bit_length(), wireshape=(3,)),
                 FancyRegister('alpha', 1),
-                FancyRegister('q', (self.M-1).bit_length(), wireshape=(3,)),
+                FancyRegister('q', (self.M - 1).bit_length(), wireshape=(3,)),
                 FancyRegister('beta', 1),
             ]
         )
@@ -45,8 +46,9 @@ class SelectChem(Bloq):
 
     def t_complexity(self) -> TComplexity:
         N = 2 * self.M**3
-        t_count =  12 * N + 8 * int(np.ceil(np.log2(N)))
+        t_count = 12 * N + 8 * int(np.ceil(np.log2(N)))
         return TComplexity(t=t_count)
+
 
 @frozen
 class PrepareChem(Bloq):
@@ -68,7 +70,8 @@ class PrepareChem(Bloq):
     """
 
     M: int
-    cvs: Tuple[int, ...] = field(default_factory=lambda: (,))
+    cvs: Tuple[int, ...] = tuple()
+    adjoint: bool = False
 
     @cached_property
     def registers(self) -> FancyRegisters:
@@ -77,9 +80,9 @@ class PrepareChem(Bloq):
                 FancyRegister('theta', 1),
                 FancyRegister('U', 1),
                 FancyRegister('V', 1),
-                FancyRegister('p', (self.M-1).bit_length(), wireshape=(3,)),
+                FancyRegister('p', (self.M - 1).bit_length(), wireshape=(3,)),
                 FancyRegister('alpha', 1),
-                FancyRegister('q', (self.M-1).bit_length(), wireshape=(3,)),
+                FancyRegister('q', (self.M - 1).bit_length(), wireshape=(3,)),
                 FancyRegister('beta', 1),
             ]
         )
@@ -90,5 +93,5 @@ class PrepareChem(Bloq):
 
     def t_complexity(self) -> TComplexity:
         N = 2 * self.M**3
-        t_count = 6 * N # + O(mu + log N) 
+        t_count = 6 * N  # + O(mu + log N)
         return TComplexity(t=t_count)

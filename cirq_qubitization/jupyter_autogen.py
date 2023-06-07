@@ -42,6 +42,7 @@ import cirq_qubitization.bloq_algos.and_bloq_test
 import cirq_qubitization.bloq_algos.basic_gates.cnot_test
 import cirq_qubitization.bloq_algos.basic_gates.swap_test
 import cirq_qubitization.bloq_algos.basic_gates.x_basis_test
+import cirq_qubitization.bloq_algos.chemistry.pw_dual_test
 import cirq_qubitization.bloq_algos.swap_network
 import cirq_qubitization.bloq_algos.swap_network_test
 import cirq_qubitization.jupyter_autogen_factories as jaf
@@ -195,6 +196,15 @@ NOTEBOOK_SPECS: List[NotebookSpec] = [
             BloqNbSpec(cirq_qubitization.bloq_algos.and_bloq_test._make_multi_and),
         ],
         directory='./bloq_algos',
+    ),
+    NotebookSpec(
+        title='PW Dual Hamiltonian',
+        module=cirq_qubitization.bloq_algos.chemistry.pw_dual,
+        gate_specs=[
+            BloqNbSpec(cirq_qubitization.bloq_algos.chemistry.pw_dual_test._make_select),
+            BloqNbSpec(cirq_qubitization.bloq_algos.chemistry.pw_dual_test._make_prepare),
+        ],
+        directory='./bloq_algos/chemistry',
     ),
 ]
 
