@@ -16,6 +16,13 @@ def _make_prepare():
     return PrepareChem(M)
 
 
+def _make_unary_iteration():
+    from cirq_qubitization.bloq_algos.chemistry.pw_dual import UnaryIteration
+
+    shape = (2, 3, 5)
+    return UnaryIteration(shape)
+
+
 def test_notebook():
     execute_notebook('chemistry')
 

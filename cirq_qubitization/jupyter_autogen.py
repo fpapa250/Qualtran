@@ -203,6 +203,7 @@ NOTEBOOK_SPECS: List[NotebookSpec] = [
         gate_specs=[
             BloqNbSpec(cirq_qubitization.bloq_algos.chemistry.pw_dual_test._make_select),
             BloqNbSpec(cirq_qubitization.bloq_algos.chemistry.pw_dual_test._make_prepare),
+            BloqNbSpec(cirq_qubitization.bloq_algos.chemistry.pw_dual_test._make_unary_iteration),
         ],
         directory='./bloq_algos/chemistry',
     ),
