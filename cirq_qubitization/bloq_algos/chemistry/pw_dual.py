@@ -104,7 +104,7 @@ class SelectedMajoranaFermion(Bloq):
     """
 
     selection_desc: Tuple[Tuple[str, Tuple[int, ...]]]
-    target_bitsize: int
+    target_desc: Tuple[str, int]
     gate: Bloq
     cvs: Tuple[int, ...] = tuple()
 
@@ -114,21 +114,21 @@ class SelectedMajoranaFermion(Bloq):
             name: ((max(it_shape) - 1).bit_length(), (len(it_shape),))
             for name, it_shape in self.selection_desc
         }
-        return FancyRegisters(
-            [FancyRegister(n, bitsize=b, wireshape=w) for n, (b, w) in reg_desc.items()]
-        )
+        trg_name, bitsize = self.target_desc
+        regs = [FancyRegister(n, bitsize=b, wireshape=w) for n, (b, w) in reg_desc.items()]
+        regs += [FancyRegister(trg_name, bitsize)]
+        return FancyRegisters(regs)
 
     def t_complexity(self) -> TComplexity:
         iteration_size = sum([np.prod(it_shape) for _, it_shape in self.selection_desc])
         return TComplexity(t=4 * iteration_size - 4)
 
-    def build_composite_bloq(
-        self, bb: 'CompositeBloqBuilder', *, sel_regs: List[SoquetT], trg_reg: SoquetT
-    ) -> Dict[str, 'SoquetT']:
-        regs = self.registers()
+    def build_composite_bloq(self, bb: 'CompositeBloqBuilder', **regs) -> Dict[str, 'SoquetT']:
+        sel_regs = {n: soq for n, soq in regs.items() if n }
         out = {}
-        # for reg_name, iteration_shape in self.selection_desc:
-        #     out = bb.add(UnaryIteration(iteration_shape))
+        for reg_name, iteration_shape in self.selection_desc:
+            print(reg_name, iteration_shape)
+            # out = bb.add(UnaryIteration(iteration_shape))
         # for t in trg_reg:
         # bb.add(self.gate, t)
 

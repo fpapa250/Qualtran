@@ -30,7 +30,8 @@ def _make_selected_majorana():
     from cirq_qubitization.bloq_algos.chemistry.pw_dual import SelectedMajoranaFermion
 
     selection_desc = (("p", (3, 3, 3)), ("alpha", (2,)))
-    return SelectedMajoranaFermion(selection_desc, XGate())
+    target_desc = ("psi", 8)
+    return SelectedMajoranaFermion(selection_desc, target_desc, XGate())
 
 
 def test_notebook():
