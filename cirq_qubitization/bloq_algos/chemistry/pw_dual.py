@@ -1,17 +1,14 @@
 from functools import cached_property
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple
 
 import numpy as np
 from attrs import frozen
 from numpy.typing import NDArray
 
 from cirq_qubitization import TComplexity
+from cirq_qubitization.bloq_algos.basic_gates.t_gate import TGate
 from cirq_qubitization.quantum_graph.bloq import Bloq
-from cirq_qubitization.quantum_graph.composite_bloq import (
-    CompositeBloq,
-    CompositeBloqBuilder,
-    SoquetT,
-)
+from cirq_qubitization.quantum_graph.composite_bloq import CompositeBloqBuilder, SoquetT
 from cirq_qubitization.quantum_graph.fancy_registers import FancyRegister, FancyRegisters
 from cirq_qubitization.quantum_graph.quantum_graph import Soquet
 
@@ -64,7 +61,16 @@ class SelectChem(Bloq):
         This method builds the `adjoint=False` composite bloq. `self.decompose_bloq()`
         will throw if `self.adjoint=True`.
         """
-        pass
+        trg_name, trg_bitsize = self.target_desc
+        target = regs[trg_name]
+        it_ranges = tuple(it_range for _, it_range in self.selection_desc)
+        sel_regs = {k: v for k, v in regs.items() if k != trg_name}
+        add_regs = {f"x{i}": sel_regs[sel] for i, sel in enumerate(sel_regs.keys())}
+        add_regs["trg"] = target
+        xs = bb.add(UnaryIteration(it_ranges, trg_bitsize), **add_regs)
+        out = {k: xs[i] for i, k in enumerate(sel_regs.keys())}
+        (out[trg_name],) = bb.add(GateOn(trg_bitsize, gate=self.gate), on=xs[-1])
+        return out
 
 
 @frozen
@@ -75,12 +81,15 @@ class UnaryIteration(Bloq):
             Babbush et. al. 2018. Section III.A. and Fig. 4.
     """
 
-    iteration_shape: Tuple[int, ...]
+    iteration_ranges: Tuple[int, ...]
+    target_bitsize: int
 
     @cached_property
     def registers(self) -> FancyRegisters:
-        bitsize = (max(self.iteration_shape) - 1).bit_length()
-        return FancyRegisters([FancyRegister('x', bitsize, wireshape=(len(self.iteration_shape),))])
+        bitsizes = [(isize - 1).bit_length() for isize in self.iteration_ranges]
+        regs = [FancyRegister(f'x{i}', bs) for i, bs in enumerate(bitsizes)]
+        regs += [FancyRegister('trg', self.target_bitsize)]
+        return FancyRegisters(regs)
 
     def pretty_name(self) -> str:
         reg_name = self.registers[0].name
@@ -89,6 +98,29 @@ class UnaryIteration(Bloq):
     def t_complexity(self) -> TComplexity:
         t_count = 4 * int(np.prod(self.iteration_shape)) - 4
         return TComplexity(t=t_count)
+
+    def rough_decompose(self, mgr):
+        t_count = 4 * int(np.prod(self.iteration_ranges)) - 4
+        return [(t_count, TGate())]
+
+
+@frozen
+class GateOn(Bloq):
+    """Placeholder for N-qubit gate
+    References:
+        (Encoding Electronic Spectra in Quantum Circuits with Linear T Complexity)[https://arxiv.org/abs/1805.03662].
+            Babbush et. al. 2018. Section III.A. and Fig. 4.
+    """
+
+    bitsize: int
+    gate: Bloq
+
+    @cached_property
+    def registers(self) -> FancyRegisters:
+        return FancyRegisters([FancyRegister('on', self.bitsize)])
+
+    def pretty_name(self) -> str:
+        return f'[{self.gate}]'
 
 
 @frozen
@@ -103,34 +135,41 @@ class SelectedMajoranaFermion(Bloq):
             Babbush et. al. 2018. Section III.A. and Fig. 4.
     """
 
-    selection_desc: Tuple[Tuple[str, Tuple[int, ...]]]
+    selection_desc: Tuple[Tuple[str, int], ...]
     target_desc: Tuple[str, int]
     gate: Bloq
     cvs: Tuple[int, ...] = tuple()
 
     @cached_property
     def registers(self) -> FancyRegisters:
-        reg_desc = {
-            name: ((max(it_shape) - 1).bit_length(), (len(it_shape),))
-            for name, it_shape in self.selection_desc
-        }
         trg_name, bitsize = self.target_desc
-        regs = [FancyRegister(n, bitsize=b, wireshape=w) for n, (b, w) in reg_desc.items()]
+        regs = [
+            FancyRegister(n, bitsize=(it_len - 1).bit_length()) for n, it_len in self.selection_desc
+        ]
         regs += [FancyRegister(trg_name, bitsize)]
         return FancyRegisters(regs)
+
+    def pretty_name(self) -> str:
+        name = f"{self.gate}"[0]
+        return rf'In[Z{name}]'
 
     def t_complexity(self) -> TComplexity:
         iteration_size = sum([np.prod(it_shape) for _, it_shape in self.selection_desc])
         return TComplexity(t=4 * iteration_size - 4)
 
-    def build_composite_bloq(self, bb: 'CompositeBloqBuilder', **regs) -> Dict[str, 'SoquetT']:
-        sel_regs = {n: soq for n, soq in regs.items() if n }
-        out = {}
-        for reg_name, iteration_shape in self.selection_desc:
-            print(reg_name, iteration_shape)
-            # out = bb.add(UnaryIteration(iteration_shape))
-        # for t in trg_reg:
-        # bb.add(self.gate, t)
+    def build_composite_bloq(
+        self, bb: 'CompositeBloqBuilder', **regs: SoquetT
+    ) -> Dict[str, 'SoquetT']:
+        trg_name, trg_bitsize = self.target_desc
+        target = regs[trg_name]
+        it_ranges = tuple(it_range for _, it_range in self.selection_desc)
+        sel_regs = {k: v for k, v in regs.items() if k != trg_name}
+        add_regs = {f"x{i}": sel_regs[sel] for i, sel in enumerate(sel_regs.keys())}
+        add_regs["trg"] = target
+        xs = bb.add(UnaryIteration(it_ranges, trg_bitsize), **add_regs)
+        out = {k: xs[i] for i, k in enumerate(sel_regs.keys())}
+        (out[trg_name],) = bb.add(GateOn(trg_bitsize, gate=self.gate), on=xs[-1])
+        return out
 
 
 @frozen
