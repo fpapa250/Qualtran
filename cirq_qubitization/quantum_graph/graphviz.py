@@ -102,6 +102,138 @@ def _parition_registers_in_a_group(
     return lefts, rights, thrus
 
 
+class SoqGraphDrawer:
+    def __init__(self, bloq: Bloq):
+        cbloq = bloq.as_composite_bloq()
+        self._cbloq = cbloq
+        self._binsts = cbloq.bloq_instances
+        self._soquets = cbloq.all_soquets
+
+        self.ids = _assign_ids_to_bloqs_and_soqs(self._binsts, self._soquets)
+
+    def get_dangle_node(self, soq: Soquet) -> pydot.Node:
+        """Overridable method to create a Node representing dangling Soquets."""
+        return pydot.Node(self.ids[soq], label=soq.pretty(), shape='plaintext')
+
+    def add_dangles(
+        self, graph: pydot.Graph, soquets: FancyRegisters, dangle: DanglingT
+    ) -> pydot.Graph:
+        """Add nodes representing dangling indices to the graph.
+
+        We wrap this in a subgraph to align (rank=same) the 'nodes'
+        """
+        if dangle is LeftDangle:
+            regs = soquets.lefts()
+        elif dangle is RightDangle:
+            regs = soquets.rights()
+        else:
+            raise ValueError()
+
+        subg = pydot.Subgraph(rank='same')
+        for reg in regs:
+            for idx in reg.wire_idxs():
+                subg.add_node(self.get_dangle_node(Soquet(dangle, reg, idx=idx)))
+        graph.add_subgraph(subg)
+        return graph
+
+    def soq_label(self, soq: Soquet):
+        if isinstance(soq.binst, BloqInstance) and isinstance(soq.binst.bloq, CirqGateAsBloq):
+            (ii,) = soq.idx
+            return f'q{ii}'
+        return soq.pretty()
+
+    def get_binst_header_text(self, binst: BloqInstance) -> str:
+        """Overridable method returning the text used for the header cell of a bloq."""
+        return f'{binst.bloq.pretty_name()}'
+
+    def add_binst(self, graph: pydot.Graph, binst: BloqInstance) -> pydot.Graph:
+        """Process and add a bloq instance to the Graph."""
+        subg = pydot.Subgraph(
+            graph_name=self.ids[binst],
+            rank='same',
+            label=self.get_binst_header_text(binst),
+            color='black',
+        )
+
+        binst_header = self.get_binst_header_text(binst)
+        for groupname, groupregs in binst.bloq.registers.groups():
+            lefts, rights, thrus = _parition_registers_in_a_group(groupregs, binst)
+            for soq in thrus:
+                subg.add_node(pydot.Node(self.ids[soq], label=self.soq_label(soq), shape='rect'))
+            for soq in lefts:
+                subg.add_node(pydot.Node(self.ids[soq], label=self.soq_label(soq), shape='rect'))
+            for soq in rights:
+                subg.add_node(pydot.Node(self.ids[soq], label=self.soq_label(soq), shape='rect'))
+
+        graph.add_subgraph(subg)
+        return graph
+
+    def cxn_label(self, cxn: Connection) -> str:
+        """Overridable method to return labels for connections."""
+        return str(cxn.shape)
+
+    def cxn_edge(self, left_id: str, right_id: str, cxn: Connection) -> pydot.Edge:
+        return pydot.Edge(
+            left_id,
+            right_id,
+            label=self.cxn_label(cxn),
+            labelfloat=True,
+            fontsize=10,
+            arrowhead='dot',
+            arrowsize=0.25,
+        )
+
+    def add_cxn(self, graph: pydot.Graph, cxn: Connection) -> pydot.Graph:
+        """Process and add a connection to the Graph.
+
+        Connections are specified using a `:` delimited set of ids. The first element
+        is the node (bloq instance). For most bloq instances, the second element is
+        the port (soquet). The final element is the compass direction of where exactly
+        the connecting line should be anchored.
+
+        For DangleT nodes, there aren't any Soquets so the second element is omitted.
+        """
+
+        if cxn.left.binst is LeftDangle:
+            left = f'{self.ids[cxn.left]}:e'
+        else:
+            left = f'{self.ids[cxn.left]}:e'
+
+        if cxn.right.binst is RightDangle:
+            right = f'{self.ids[cxn.right]}:w'
+        else:
+            right = f'{self.ids[cxn.right]}:w'
+
+        graph.add_edge(self.cxn_edge(left, right, cxn))
+        return graph
+
+    def get_graph(self) -> pydot.Graph:
+        """Get the graphviz graph representing the Bloq.
+
+        This is the main entry-point to this class.
+        """
+        graph = pydot.Dot('my_graph', graph_type='digraph', rankdir='LR')
+        graph = self.add_dangles(graph, self._cbloq.registers, LeftDangle)
+
+        for binst in self._binsts:
+            graph = self.add_binst(graph, binst)
+
+        graph = self.add_dangles(graph, self._cbloq.registers, RightDangle)
+
+        for cxn in self._cbloq.connections:
+            graph = self.add_cxn(graph, cxn)
+
+        return graph
+
+    def get_svg_bytes(self) -> bytes:
+        """Get the SVG code (as bytes) for drawing the graph."""
+        return self.get_graph().create_svg()
+
+    def get_svg(self) -> IPython.display.SVG:
+        """Get an IPython SVG object displaying the graph."""
+        return IPython.display.SVG(self.get_svg_bytes())
+
+
 class GraphDrawer:
     """A class to encapsulate methods for displaying a CompositeBloq as a graph using graphviz.
 
