@@ -1,3 +1,4 @@
+from abc import ABCMeta
 from functools import cached_property
 from typing import Dict, Tuple
 
@@ -542,6 +543,35 @@ class Prepare(Bloq):
 
 
 @frozen
+class IndexedPrepare(Bloq):
+    """SelectMajoranaFermion Bloq
+    Args:
+
+    Registers:
+
+    References:
+    """
+
+    selection_bitsizes: Tuple[int, ...]
+    data_bitsizes: Tuple[int, ...]
+    output_bitsizes: Tuple[int, ...]
+    cvs: Tuple[int, ...] = tuple()
+    adjoint: bool = False
+
+    @cached_property
+    def registers(self) -> FancyRegisters:
+        regs = [FancyRegister(f"s_{i}", bitsize=bs) for i, bs in enumerate(self.selection_bitsizes)]
+        regs = [FancyRegister(f"d_{i}", bitsize=bs) for i, bs in enumerate(self.data_bitsizes)]
+        regs += [FancyRegister(f"o_{i}", bitsize=bs) for i, bs in enumerate(self.output_bitsizes)]
+        regs += [FancyRegister(f"c_{i}", bitsize=1) for i in range(len(self.cvs))]
+        return FancyRegisters(regs)
+
+    def pretty_name(self) -> str:
+        dag = '†' if self.adjoint else ''
+        return rf'IndPrep{dag}'
+
+
+@frozen
 class SingleFactorization(Bloq):
     """
 
@@ -604,6 +634,30 @@ class SingleFactorization(Bloq):
 
 
 @frozen
+class AddMod(Bloq):
+    input_bitsize: int
+    output_bitsize: int
+
+    @cached_property
+    def register(self) -> FancyRegister:
+        return FancyRegisters(
+            [
+                FancyRegister('input', self.input_bitsize),
+                FancyRegister('output', self.output_bitsize),
+            ]
+        )
+
+    def rough_decompose(self, mgr):
+        if isinstance(self.input_bitsize, sympy.Symbol):
+            # t_count = big_O(4 * np.prod(self.iteration_ranges) - 4
+            t_count = big_O(self.input_bitsize)
+        else:
+            # TODO: this is worst case use proper decompose
+            t_count = 2 * self.input_bitsize
+        return [(t_count, TGate())]
+
+
+@frozen
 class BlockEncoding(Bloq):
     l_bitsize: int
     k_bitsize: int
@@ -649,6 +703,17 @@ class BlockEncoding(Bloq):
             o_1=regs['Q'],
             c_0=regs['succ'],
         )
+        l, k, p, q, re_im, succ_kpq = bb.add(
+            IndexedPrepare(
+                (self.l_bitsize,), (self.k_bitsize, self.p_bitsize, self.p_bitsize, 1), cvs=(1,)
+            ),
+            s_0=l,
+            d_0=regs['k'],
+            d_1=regs['p'],
+            d_2=regs['q'],
+            d_3=regs['ReIm'],
+            c_0=regs['succ_kpq'],
+        )
         (ab,) = bb.add(HGate(), q=regs['AB'])
         (term,) = bb.add(HGate(), q=regs['term'])
         (anc,) = bb.add(HGate(), q=regs['anc'])
@@ -656,9 +721,9 @@ class BlockEncoding(Bloq):
         (alpha, psia, psib) = bb.add(
             CSwapApprox(self.target_bitsize), ctrl=alpha, x=regs['psia'], y=regs['psib']
         )
-        # missing add mod
-        (anc, p, q) = bb.add(CSwapApprox(self.p_bitsize), ctrl=anc, x=regs['p'], y=regs['q'])
-        (ab, two_body, re_im) = bb.add(ToffoliGate(), c0=ab, c1=two_body, t=regs['ReIm'])
+        k, Q = bb.add(AddMod(self.k_bitsize, self.k_bitsize), input=k, output=Q)
+        (anc, p, q) = bb.add(CSwapApprox(self.p_bitsize), ctrl=anc, x=p, y=q)
+        (ab, two_body, re_im) = bb.add(ToffoliGate(), c0=ab, c1=two_body, t=re_im)
         (re_im, term) = bb.add(CNOT(), ctrl=re_im, target=term)
         smf = SelectedMajoranaFermion(
             selection_bitsizes=(self.k_bitsize, self.p_bitsize, 1),
@@ -667,7 +732,7 @@ class BlockEncoding(Bloq):
             cvs=(1, 1),
         )
         (Q, q, term, psia, succ, succ_kpq) = bb.add(
-            smf, s_0=Q, s_1=q, s_2=term, t=psia, c_0=succ, c_1=regs['succ_kpq']
+            smf, s_0=Q, s_1=q, s_2=term, t=psia, c_0=succ, c_1=succ_kpq
         )
         # Missing Multi control
         (re_im, term) = bb.add(CNOT(), ctrl=re_im, target=term)
@@ -678,13 +743,26 @@ class BlockEncoding(Bloq):
             cvs=(1, 1),
         )
         (k, p, term, psia, succ, succ_kpq) = bb.add(
-            smf, s_0=regs['k'], s_1=p, s_2=term, t=psia, c_0=succ, c_1=succ_kpq
+            smf, s_0=k, s_1=p, s_2=term, t=psia, c_0=succ, c_1=succ_kpq
         )
         (ab, two_body, re_im) = bb.add(ToffoliGate(), c0=ab, c1=two_body, t=re_im)
-        # Add mod
+        k, Q = bb.add(AddMod(self.k_bitsize, self.k_bitsize), input=k, output=Q)
         (alpha, psia, psib) = bb.add(CSwapApprox(self.target_bitsize), ctrl=alpha, x=psia, y=psib)
         (anc, p, q) = bb.add(CSwapApprox(self.p_bitsize), ctrl=anc, x=p, y=q)
-        # in_prep_l
+        l, k, p, q, re_im, succ_kpq = bb.add(
+            IndexedPrepare(
+                (self.l_bitsize,),
+                (self.k_bitsize, self.p_bitsize, self.p_bitsize, 1),
+                cvs=(1,),
+                adjoint=True,
+            ),
+            s_0=l,
+            d_0=k,
+            d_1=p,
+            d_2=q,
+            d_3=re_im,
+            c_0=succ_kpq,
+        )
         (ab,) = bb.add(HGate(), q=ab)
         (term,) = bb.add(HGate(), q=term)
         (anc,) = bb.add(HGate(), q=anc)
