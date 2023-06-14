@@ -303,39 +303,39 @@ class SubPrepareChem(PrepareOracle):
             prepare: SUBPREPARE circuit with alt and keep values built from
                 matrix elements via coherent alias sampling.
         """
-        assert ndim == 3, "Only 3D systems are allowed."
+        assert ndim == 3
         num_spatial_orbs = len(T)
         assert len(U) == num_spatial_orbs
         assert len(V) == num_spatial_orbs
         assert len(Vx) == num_spatial_orbs
         # Number of orbitals in each direction assuming a cubic box
         M = math.ceil(math.log(num_spatial_orbs, 3))
-        assert M**3 == num_spatial_orbs, f"{M} vs {num_spatial_orbs}"
+        assert M**ndim == num_spatial_orbs, f"{M} vs {num_spatial_orbs}"
         # Eq. 52 in linear T paper
         lambda_H = np.sum(np.abs(T)) + np.sum(np.abs(U)) + np.sum(np.sum(Vx))
         # Stores the Tilde versions of T, U, and V defined in class docstring.
-        coeffs = np.zeros((3, num_spatial_orbs), dtype=np.float64)
+        coeffs = np.zeros((ndim, num_spatial_orbs), dtype=np.float64)
         # |00>_{UV}
         coeffs[0] = np.sqrt(np.abs(T) / lambda_H)
         # |01>_{UV}
         coeffs[1] = np.sqrt(np.abs(V) / (4 * lambda_H))
         # |10>_{UV}
         coeffs[2] = np.sqrt(np.abs(T[0] + U + Vx) / (2 * lambda_H))
-        thetas = np.zeros((4, num_spatial_orbs), dtype=np.int8)
+        thetas = np.zeros((ndim, num_spatial_orbs), dtype=np.int8)
         # theta_p^0 |00>_{UV}
         thetas[0] = (1 - np.sign(T)) // 2
         # theta_p^1 |01>_{UV}
         thetas[1] = (1 - np.sign(V)) // 2
         # theta_p |10>_{UV}
         thetas[2] = (1 - np.sign(-(T[0] + U + Vx))) // 2
-        thetas = thetas.reshape((2, 2, M, M, M))
+        thetas = thetas.reshape((2, 2) + (M,) * ndim)
         assert np.allclose(thetas[0, 0].ravel(), (1 - np.sign(T)) / 2)
         assert np.allclose(thetas[0, 1].ravel(), (1 - np.sign(V)) / 2)
         alt3, keep3, mu = preprocess_lcu_coefficients_for_reversible_sampling(
             lcu_coefficients=coeffs.ravel(), epsilon=probability_epsilon
         )
         # Map alt indices back to unravelled form alt_l -> alt_{(U, V, p)}
-        altUV, altp3 = np.unravel_index(alt3, (3, num_spatial_orbs))
+        altUV, altp3 = np.unravel_index(alt3, (ndim, num_spatial_orbs))
         assert np.all(altp3 < num_spatial_orbs)
         # Enlarged arrays with where U=1, V=1 will be all zeros
         altU = np.zeros(thetas.size, dtype=np.int_)
@@ -345,7 +345,7 @@ class SubPrepareChem(PrepareOracle):
         altpz = np.zeros(thetas.size, dtype=np.int_)
         keep = np.zeros(thetas.size, dtype=np.int_)
         # Map altp indices back to unravelled form alt_p -> alt_{(U, V, px, py, pz)}
-        _altpx, _altpy, _altpz = np.unravel_index(altp3, (M,) * 3)
+        _altpx, _altpy, _altpz = np.unravel_index(altp3, (M,) * ndim)
         altpx[: 3 * num_spatial_orbs] = _altpx
         altpy[: 3 * num_spatial_orbs] = _altpy
         altpz[: 3 * num_spatial_orbs] = _altpz
@@ -354,7 +354,7 @@ class SubPrepareChem(PrepareOracle):
         # indices 1 from alt correspond to U = |01>
         altV[np.where(altUV == 1)] = 1
         keep[: 3 * num_spatial_orbs] = keep3
-        data_shape = (2, 2, M, M, M)
+        data_shape = (2, 2) + (ndim,) * ndim
         return SubPrepareChem(
             M=M,
             theta_l=thetas,

@@ -3,8 +3,11 @@ import numpy as np
 
 import cirq_qubitization as cq
 import cirq_qubitization.cirq_infra.testing as cq_testing
-from cirq_qubitization.cirq_algos.chemistry import PrepareChem, SelectChem
+from cirq_qubitization.cirq_algos.chemistry import PrepareChem, SelectChem, SubPrepareChem
 from cirq_qubitization.jupyter_tools import execute_notebook
+from cirq_qubitization.cirq_algos.state_preparation_test import (
+    construct_gate_helper_and_qubit_order,
+)
 
 
 def test_select_t_complexity():
@@ -83,6 +86,56 @@ def test_prepare():
     g = cq_testing.GateHelper(prep)
     cirq.Circuit(cirq.decompose_once(g.operation))
     cost = cq.t_complexity(prep)
+
+
+def test_subprepare():
+    M = 2
+    num_spat_orb = M**3
+    Us, Ts, Vs, Vxs = np.random.normal(size=4 * num_spat_orb).reshape((4, num_spat_orb))
+    prep = SubPrepareChem.build_from_coefficients(Ts, Us, Vs, Vxs, probability_epsilon=0.01)
+    g, qubit_order, _ = construct_gate_helper_and_qubit_order(prep)
+    circuit = cirq.Circuit(cirq.decompose_once(g.operation))
+    cirq.testing.assert_has_diagram(
+        circuit,
+        '''
+theta: ──────────────────────────QROM_6────────────────────────────────────────────────
+                                 │
+U: ─────────────────UNIFORM(3)───In───────────────────×(y)─────────────────────────────
+                    │            │                    │
+V: ─────────────────target───────In───────────────────┼──────×(y)──────────────────────
+                                 │                    │      │
+px: ────────────────UNIFORM(8)───In───────────────────┼──────┼──────×(y)───────────────
+                    │            │                    │      │      │
+py: ────────────────target───────In───────────────────┼──────┼──────×(y)───────────────
+                    │            │                    │      │      │
+pz: ────────────────target───────In───────────────────┼──────┼──────×(y)───────────────
+                                 │                    │      │      │
+sigma_mu0: ─────────H────────────┼────────In(y)───────┼──────┼──────┼──────In(y)───────
+                                 │        │           │      │      │      │
+sigma_mu1: ─────────H────────────┼────────In(y)───────┼──────┼──────┼──────In(y)───────
+                                 │        │           │      │      │      │
+sigma_mu2: ─────────H────────────┼────────In(y)───────┼──────┼──────┼──────In(y)───────
+                                 │        │           │      │      │      │
+altU: ───────────────────────────QROM_0───┼───────────×(x)───┼──────┼──────┼───────────
+                                 │        │           │      │      │      │
+altV: ───────────────────────────QROM_1───┼───────────┼──────×(x)───┼──────┼───────────
+                                 │        │           │      │      │      │
+altpx: ──────────────────────────QROM_2───┼───────────┼──────┼──────×(x)───┼───────────
+                                 │        │           │      │      │      │
+altpy: ──────────────────────────QROM_3───┼───────────┼──────┼──────×(x)───┼───────────
+                                 │        │           │      │      │      │
+altpz: ──────────────────────────QROM_4───┼───────────┼──────┼──────×(x)───┼───────────
+                                 │        │           │      │      │      │
+keep0: ──────────────────────────QROM_5───In(x)───────┼──────┼──────┼──────In(x)───────
+                                 │        │           │      │      │      │
+keep1: ──────────────────────────QROM_5───In(x)───────┼──────┼──────┼──────In(x)───────
+                                 │        │           │      │      │      │
+keep2: ──────────────────────────QROM_5───In(x)───────┼──────┼──────┼──────In(x)───────
+                                          │           │      │      │      │
+less_than_equal: ─────────────────────────+(x <= y)───@──────@──────@──────+(x <= y)───
+''',
+        qubit_order=qubit_order,
+    )
 
 
 def test_notebook():
