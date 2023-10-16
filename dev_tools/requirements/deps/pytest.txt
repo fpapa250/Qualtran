@@ -9,3 +9,6 @@ pytest-xdist
 nbformat
 nbconvert
 ipykernel
+
+# openfermion for chemistry resource estimates
+openfermion
