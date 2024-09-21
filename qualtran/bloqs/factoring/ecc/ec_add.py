@@ -50,7 +50,7 @@ class ECAdd(Bloq):
            will contain the x component of the resultant curve point.
         y: The y component of the second input elliptic curve point of bitsize `n`, which
            will contain the y component of the resultant curve point.
-        lam: The precomputed lambda slope used in the addition operation.
+        lam_r: The precomputed lambda slope used in the addition operation.
 
     References:
         [How to compute a 256-bit elliptic curve private key with only 50 million Toffoli gates](https://arxiv.org/abs/2306.08585).
@@ -68,7 +68,7 @@ class ECAdd(Bloq):
                 Register('b', QUInt(self.n)),
                 Register('x', QUInt(self.n)),
                 Register('y', QUInt(self.n)),
-                Register('lam', QUInt(self.n)),
+                Register('lam_r', QUInt(self.n)),
             ]
         )
 
