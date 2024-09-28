@@ -14,7 +14,7 @@
 
 import functools
 from functools import cached_property
-from typing import Dict
+from typing import Dict, Union
 
 import sympy
 from attrs import frozen
@@ -66,7 +66,7 @@ class FindECCPrivateKey(Bloq):
     Args:
         n: The bitsize of the elliptic curve points' x and y registers.
         base_point: The base point $P$ with unknown order $r$ such that $P = [r] P$.
-        public_key: The public key $Q$ such that $Q = [k] P$ for private key $k$.
+        public_key: The public key(s) $Q$ such that $Q = [k] P$ for private key $k$.
         window_size: If greater than one, use windowed elliptic curve point addition.
 
     References:
@@ -76,7 +76,7 @@ class FindECCPrivateKey(Bloq):
 
     n: int
     base_point: ECPoint
-    public_key: ECPoint
+    public_keys: list[ECPoint]
     window_size: int = 1
 
     @cached_property
@@ -104,7 +104,8 @@ class FindECCPrivateKey(Bloq):
         y = bb.add(IntState(bitsize=self.n, val=self.base_point.y))
 
         x, y = bb.add(self.ec_pe_r(point=self.base_point), x=x, y=y)
-        x, y = bb.add(self.ec_pe_r(point=self.public_key), x=x, y=y)
+        for public_key in self.public_keys:
+            x, y = bb.add(self.ec_pe_r(point=public_key), x=x, y=y)
 
         bb.add(Free(QUInt(self.n), dirty=True), reg=x)
         bb.add(Free(QUInt(self.n), dirty=True), reg=y)
@@ -115,7 +116,7 @@ class FindECCPrivateKey(Bloq):
         Ry = ssa.new_symbol('Ry')
         generic_point = ECPoint(Rx, Ry, mod=self.mod, curve_a=self.curve_a)
 
-        return {self.ec_pe_r(point=generic_point): 2}
+        return {self.ec_pe_r(point=generic_point): len(self.public_keys) + 1}
 
     def cost_attrs(self):
         return [('n', self.n)]
@@ -127,8 +128,19 @@ def _ecc() -> FindECCPrivateKey:
     Px, Py, Qx, Qy = sympy.symbols('P_x P_y Q_x Q_y')
     P = ECPoint(Px, Py, mod=p)
     Q = ECPoint(Qx, Qy, mod=p)
-    ecc = FindECCPrivateKey(n=n, base_point=P, public_key=Q)
+    ecc = FindECCPrivateKey(n=n, base_point=P, public_keys=[Q])
     return ecc
 
 
-_ECC_BLOQ_DOC = BloqDocSpec(bloq_cls=FindECCPrivateKey, examples=[_ecc])
+@bloq_example
+def _repeated_ecc() -> FindECCPrivateKey:
+    n, p = sympy.symbols('n p')
+    Px, Py, Qx1, Qy1, Qx2, Qy2 = sympy.symbols('P_x P_y Q_x1 Q_y1 Q_x2 Q_y2')
+    P = ECPoint(Px, Py, mod=p)
+    Q1 = ECPoint(Qx1, Qy1, mod=p)
+    Q2 = ECPoint(Qx2, Qy2)
+    repeated_ecc = FindECCPrivateKey(n=n, base_point=P, public_keys=[Q1, Q2])
+    return repeated_ecc
+
+
+_ECC_BLOQ_DOC = BloqDocSpec(bloq_cls=FindECCPrivateKey, examples=[_ecc, _repeated_ecc])

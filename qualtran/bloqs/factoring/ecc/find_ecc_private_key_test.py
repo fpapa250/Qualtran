@@ -13,11 +13,15 @@
 #  limitations under the License.
 
 import qualtran.testing as qlt_testing
-from qualtran.bloqs.factoring.ecc.find_ecc_private_key import _ecc
+from qualtran.bloqs.factoring.ecc.find_ecc_private_key import _ecc, _repeated_ecc
 
 
 def test_ecc(bloq_autotester):
     bloq_autotester(_ecc)
+
+
+def test_repeated_ecc(bloq_autotester):
+    bloq_autotester(_repeated_ecc)
 
 
 def test_notebook():
