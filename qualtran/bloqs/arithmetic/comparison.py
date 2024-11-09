@@ -1001,6 +1001,25 @@ class Equals(Bloq):
         x, y = bb.add(Xor(self.dtype), x=x, y=y)
 
         return {'x': x, 'y': y, 'target': target}
+    
+    def get_ctrl_system(self, ctrl_spec: 'CtrlSpec') -> Tuple['Bloq', 'AddControlledT']:
+        from qualtran.bloqs.basic_gates import CNOT, Toffoli
+
+        if ctrl_spec == CtrlSpec():
+            bloq: 'Bloq' = CNOT()
+        elif ctrl_spec == CtrlSpec(cvs=(1, 1)):
+            bloq = Toffoli()
+        else:
+            return super().get_ctrl_system(ctrl_spec)
+
+        def add_controlled(
+            bb: 'BloqBuilder', ctrl_soqs: Sequence['SoquetT'], in_soqs: Dict[str, 'SoquetT']
+        ) -> Tuple[Iterable['SoquetT'], Iterable['SoquetT']]:
+            (ctrl_soq,) = ctrl_soqs
+            ctrl_soq, target = bb.add(bloq, ctrl=ctrl_soq, target=in_soqs['q'])
+            return (ctrl_soq,), (target,)
+
+        return bloq, add_controlled
 
     def build_call_graph(self, ssa: 'SympySymbolAllocator') -> 'BloqCountDictT':
         cvs: Union[list[int], HasLength]
